@@ -30,7 +30,7 @@ st.divider()
 # --------------------------------------------------
 # LOAD DATA
 # --------------------------------------------------
-THIS_DIR = Path(__file__).parent
+THIS_DIR = Path(__file__).parent.parent
 path = THIS_DIR / 'katyani stock as on -3 years.xlsx'
 # path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/katyani stock as on -3 years.xlsx'
 sheet = 2
