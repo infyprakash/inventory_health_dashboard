@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from pathlib import Path
 
 from utils.utilities import (
     read_dataset,
@@ -30,7 +31,9 @@ st.divider()
 # ---------------------------------------------------
 # LOAD DATA
 # ---------------------------------------------------
-path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/katyani stock as on -3 years.xlsx'
+THIS_DIR = Path(__file__).parent
+path = THIS_DIR / 'katyani stock as on -3 years.xlsx'
+# path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/katyani stock as on -3 years.xlsx'
 sheet = 2
 
 current_df = read_dataset(path=path, sheet=sheet)
