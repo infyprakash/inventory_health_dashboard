@@ -105,6 +105,27 @@ with st.sidebar:
         "📦 Product",
         products
     )
+    st.divider()
+
+    st.header("📦 Inventory Parameters")
+
+    lead_days = st.number_input(
+        "🚚 Lead Days",
+        min_value=1,
+        max_value=365,
+        value=75,
+        step=1,
+        help="Expected supplier lead time in days"
+    )
+
+    max_lead_days = st.number_input(
+        "⏳ Maximum Lead Days",
+        min_value=1,
+        max_value=365,
+        value=80,
+        step=1,
+        help="Maximum observed lead time"
+    )
 
     st.divider()
 
@@ -208,8 +229,8 @@ try:
 
     per_day_sales = total_sales / total_sale_days
 
-    lead_days = 75
-    max_lead_days = 80
+    # lead_days = 75
+    # max_lead_days = 80
 
     lead_days_sales = lead_days * per_day_sales
 
