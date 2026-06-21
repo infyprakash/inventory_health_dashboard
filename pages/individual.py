@@ -1,7 +1,6 @@
 import pandas as pd
 import streamlit as st
 from pathlib import Path
-
 from utils.utilities import (
     read_dataset,
     process_record_by_transactions_type,
@@ -20,314 +19,351 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
+# GLOBAL STYLES (same design language)
+# --------------------------------------------------
+st.markdown("""
+<style>
+
+.metric-box {
+    background: #F8FFF8;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid #D6EFD6;
+}
+
+.section-header {
+    background: linear-gradient(90deg,#E8F5E9,#C8E6C9);
+    padding: 14px;
+    border-radius: 12px;
+    border-left: 6px solid #2E7D32;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.product-card {
+    background: white;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid #E5E7EB;
+    margin-bottom: 10px;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# --------------------------------------------------
 # HEADER
 # --------------------------------------------------
-st.title("📦 Product Health Analysis")
-st.caption("Inventory Health • Sales Trend • Reorder Recommendation")
-
-st.divider()
+st.markdown("""
+<div style="
+    background: linear-gradient(90deg,#E8F5E9,#C8E6C9);
+    padding:18px;
+    border-radius:14px;
+    border-left:6px solid #2E7D32;
+    margin-bottom:20px;
+">
+    <h2 style="margin:0;color:#1B5E20;">
+        📦 Product Health Analysis Dashboard
+    </h2>
+    <p style="margin-top:6px;color:#33691E;">
+        Inventory aging • Batch health • Forecasting • Safety stock • Reorder planning
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # --------------------------------------------------
 # LOAD DATA
 # --------------------------------------------------
-THIS_DIR = Path(__file__).parent.parent
-path = THIS_DIR / 'katyani stock as on -3 years.xlsx'
-# path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/katyani stock as on -3 years.xlsx'
-sheet = 2
+# file_path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/katyani stock as on -3 years.xlsx'
 
-current_df = read_dataset(path=path, sheet=sheet)
+THIS_DIR = Path(__file__).parent.parent
+file_path = THIS_DIR / 'katyani stock as on -3 years.xlsx'
+
+
+current_df = read_dataset(path=file_path, sheet=2)
+current_df.loc[current_df['opening_qty'] > 0, 'date'] = '7/17/2025'
+current_df['formatted_date'] = pd.to_datetime(current_df['date'], format='%m/%d/%Y')
+
 current_transactions = process_record_by_transactions_type(current_df)
+
+product_group_names = unique_product_group_name(current_transactions)
 
 # --------------------------------------------------
 # SIDEBAR
 # --------------------------------------------------
 with st.sidebar:
-
-    st.header("⚙️ Product Selection")
-
-    product_group_names = unique_product_group_name(
-        current_transactions
-    )
+    st.header("⚙️ Filters")
 
     selected_group = st.selectbox(
-        "🏭 Product Group",
-        options=product_group_names
+        "📂 Product Group Name",
+        product_group_names
     )
 
-    products = products_of_seller(
-        current_transactions,
-        selected_group
-    )
+    products = products_of_seller(current_transactions, selected_group)
 
     selected_product = st.selectbox(
         "📦 Product",
-        options=products
-    )
-    lead_days = st.number_input(
-        "🚚 Lead Days",
-        min_value=1,
-        max_value=365,
-        value=75,
-        step=1,
-        help="Expected supplier lead time in days"
+        products
     )
 
-    max_lead_days = st.number_input(
-        "⏳ Maximum Lead Days",
-        min_value=1,
-        max_value=365,
-        value=80,
-        step=1,
-        help="Maximum observed lead time"
-    )
+    st.divider()
+
+    st.info("""
+    📊 Metrics included:
+
+    • Stock Position  
+    • Inventory Aging  
+    • Batch Movement  
+    • Forecast Demand  
+    • Safety Stock  
+    • Reorder Levels
+    """)
 
 # --------------------------------------------------
-# PRODUCT DATA
+# PRODUCT CARD
 # --------------------------------------------------
-use_col = [
-    'date',
-    'transaction_type',
-    'uom',
-    'batch',
-    'mfg_date',
-    'exp_date',
-    'quantity',
-    'value',
-    'unit_price'
-]
-
-product_df = current_transactions[
-    current_transactions['product'] == selected_product
-][use_col]
-
-stock_in_hand = get_net_stock_balance(product_df)
-
-sorted_product = product_df.sort_values(by='date')
-
-product_sales = sorted_product[
-    sorted_product['transaction_type'] == 'sales'
-]
-
-product_sales_series = (
-    product_sales
-    .sort_values(by='date')[['date', 'quantity']]
-)
-
-product_sales_series = (
-    product_sales_series
-    .groupby('date')['quantity']
-    .sum()
-    .reset_index()
-)
-
-monthly_df = (
-    product_sales_series
-    .groupby(pd.Grouper(key='date', freq='ME'))
-    .sum()
-    .reset_index()
-)
-
-total_sales = monthly_df['quantity'].sum()
-duration = len(monthly_df)
+st.markdown(f"""
+<div class="product-card">
+<b>📂 Group:</b> {selected_group} <br>
+<b>📦 Product:</b> {selected_product}
+</div>
+""", unsafe_allow_html=True)
 
 # --------------------------------------------------
-# FORECAST (UNCHANGED)
+# MAIN LOGIC (UNCHANGED)
 # --------------------------------------------------
-for i in range(2):
+try:
 
-    monthly_df.loc[len(monthly_df)] = [
-        monthly_df['date'].iloc[-1] + pd.Timedelta(days=30),
-        monthly_df['quantity'].tail(duration).mean()
+    use_col = ['date','transaction_type','uom','batch','mfg_date','exp_date',
+               'quantity','value','unit_price']
+
+    product_df = current_transactions[
+        current_transactions['product'] == selected_product
+    ][use_col]
+
+    sorted_product = product_df.sort_values(by='date')
+
+    product_sales = sorted_product[
+        sorted_product['transaction_type'] == 'sales'
     ]
 
-pm1 = monthly_df['quantity'].iloc[-2]
-pm2 = monthly_df['quantity'].iloc[-1]
+    last_sale = product_sales.iloc[-1].date
 
-per_day_sales = total_sales / (duration * 30)
+    batches = sorted_product['batch'].unique()
 
-# lead_days = 75
-# max_lead_days = 80
+    batch_record = []
 
-lead_days_sales = lead_days * per_day_sales
+    for batch in batches:
+        filtered_df = sorted_product[sorted_product['batch'] == batch].sort_values(by='date')
 
-stock_until_lead_days = (
-    stock_in_hand - lead_days_sales
-)
+        if not filtered_df.empty:
+            filtered_sales_df = filtered_df[filtered_df['transaction_type'] == 'sales']
 
-order_point_with_lead = (
-    pm1 + pm2 - stock_until_lead_days
-)
+            if not filtered_sales_df.empty:
+                last_batch_sales = filtered_sales_df.iloc[-1]['date']
+                opening_date = filtered_df.iloc[0]['date']
+                f_net_stock = get_net_stock_balance(filtered_df)
 
-order_point_without_lead = (
-    pm1 + pm2
-)
+                if int(f_net_stock) == 0:
+                    batch_record.append({
+                        'batch': batch,
+                        'opening_date': opening_date,
+                        'net_stock': round(f_net_stock, 2),
+                        'days_in_inventory': (last_batch_sales - opening_date).days
+                    })
+                else:
+                    batch_record.append({
+                        'batch': batch,
+                        'opening_date': opening_date,
+                        'net_stock': round(f_net_stock, 2),
+                        'days_in_inventory': (last_sale - opening_date).days
+                    })
 
-# --------------------------------------------------
-# KPI SECTION
-# --------------------------------------------------
-st.subheader("📈 Product Overview")
+    batch_df = pd.DataFrame(batch_record)
 
-c1, c2, c3, c4 = st.columns(4)
+    average_days_in_inventory = round(batch_df['days_in_inventory'].mean(), 2)
 
-with c1:
-    st.metric(
-        "📦 Stock In Hand",
-        round(stock_in_hand, 2)
-    )
+    first_sale_date = product_sales.iloc[0].date
+    last_sale_date = product_sales.iloc[-1].date
 
-with c2:
-    st.metric(
-        "📊 Total Sales",
-        round(total_sales, 2)
-    )
+    stock_in_hand = get_net_stock_balance(product_df)
 
-with c3:
-    st.metric(
-        "📅 Forecast Month 1",
-        round(pm1, 2)
-    )
+    product_sales_series = product_sales.sort_values(by='date')[['date','quantity']]
+    product_sales_series = product_sales_series.groupby('date')['quantity'].sum().reset_index()
 
-with c4:
-    st.metric(
-        "📅 Forecast Month 2",
-        round(pm2, 2)
-    )
+    total_sale_days = (last_sale_date - first_sale_date).days
 
-st.divider()
+    monthly_df = product_sales_series.groupby(pd.Grouper(key='date', freq='ME')).sum().reset_index()
 
-# --------------------------------------------------
-# REORDER KPI
-# --------------------------------------------------
-st.subheader("🛒 Reorder Recommendation")
+    total_sales = monthly_df['quantity'].sum()
+    duration = len(monthly_df)
 
-r1, r2, r3 = st.columns(3)
-
-with r1:
-    st.metric(
-        "🚚 Lead Days",
-        lead_days
-    )
-
-with r2:
-    st.metric(
-        "📦 Reorder With Lead",
-        round(order_point_with_lead, 2)
-    )
-
-with r3:
-    st.metric(
-        "📦 Reorder Without Lead",
-        round(order_point_without_lead, 2)
-    )
-
-st.divider()
-
-# --------------------------------------------------
-# TABS
-# --------------------------------------------------
-tab1, tab2, tab3, tab4 = st.tabs(
-    [
-        "📈 Sales Trend",
-        "🛒 Reorder Analysis",
-        "📋 Transactions",
-        "📊 Monthly Sales"
-    ]
-)
-
-# --------------------------------------------------
-# TAB 1
-# --------------------------------------------------
-with tab1:
-
-    st.subheader("📈 Product Sales Trend")
-
-    chart_df = monthly_df.copy()
-
-    st.line_chart(
-        chart_df.set_index('date')['quantity']
-    )
-
-# --------------------------------------------------
-# TAB 2
-# --------------------------------------------------
-with tab2:
-
-    reorder_df = pd.DataFrame({
-        'product': [selected_product],
-        'net_stock': [stock_in_hand],
-        'forecast_month_1': [pm1],
-        'forecast_month_2': [pm2],
-        'order_point_with_lead': [
-            order_point_with_lead
-        ],
-        'order_point_without_lead': [
-            order_point_without_lead
+    for i in range(2):
+        monthly_df.loc[len(monthly_df)] = [
+            monthly_df['date'].iloc[-1] + pd.Timedelta(days=30),
+            monthly_df['quantity'].tail(duration).mean()
         ]
-    })
 
-    st.dataframe(
-        reorder_df,
-        use_container_width=True
-    )
+    pm1, pm2 = monthly_df['quantity'].iloc[-2], monthly_df['quantity'].iloc[-1]
 
-    st.download_button(
-        "⬇️ Download Recommendation",
-        reorder_df.to_csv(index=False),
-        file_name=f"{selected_product}_reorder.csv",
-        mime="text/csv"
-    )
+    per_day_sales = total_sales / total_sale_days
+
+    lead_days = 75
+    max_lead_days = 80
+
+    lead_days_sales = lead_days * per_day_sales
+
+    safety_stock = (
+        product_sales_series['quantity'].max() * max_lead_days
+    ) - lead_days_sales
+
+    stock_until_lead_days = stock_in_hand - lead_days_sales
+
+    order_point_with_lead = pm1 + pm2 - stock_until_lead_days
+    order_point_without_lead = pm1 + pm2
+
+    # --------------------------------------------------
+    # KPI CARDS
+    # --------------------------------------------------
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    with col1:
+        st.metric("📦 Stock", round(stock_in_hand,2))
+
+    with col2:
+        st.metric("⏳ Aging", average_days_in_inventory)
+
+    with col3:
+        st.metric("📈 M+1", round(pm1,2))
+
+    with col4:
+        st.metric("📈 M+2", round(pm2,2))
+
+    with col5:
+        st.metric("🛡️ Safety Stock", round(safety_stock,2))
+
+    # --------------------------------------------------
+    # BATCH TABLE
+    # --------------------------------------------------
+    st.markdown("""
+    <div class="section-header">
+        📋 Batch Inventory Analysis
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.dataframe(batch_df, use_container_width=True, height=250)
+
+    # --------------------------------------------------
+    # REORDER METRICS
+    # --------------------------------------------------
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.metric("📦 Reorder (Lead)", round(order_point_with_lead,2))
+
+    with col2:
+        st.metric("📦 Reorder (No Lead)", round(order_point_without_lead,2))
+
+    # --------------------------------------------------
+    # FINAL OUTPUT
+    # --------------------------------------------------
+    if stock_in_hand != 0:
+        reorder = {
+            'product': [selected_product],
+            'net_stock': round(stock_in_hand,2),
+            'days_in_inventory': total_sale_days,
+            'average_days_in_inventory_by_batch': average_days_in_inventory,
+            'days_to_expire': 0,
+            monthly_df['date'].iloc[-2]: [monthly_df['quantity'].iloc[-2]],
+            monthly_df['date'].iloc[-1]: [monthly_df['quantity'].iloc[-1]],
+            'order_point_with_lead': [round(order_point_with_lead,2)],
+            'order_point_without_lead': [round(order_point_without_lead,2)],
+            'safety_stock': safety_stock,
+        }
+    else:
+        reorder = {
+            'product': [selected_product],
+            'net_stock': round(stock_in_hand,2),
+            'days_in_inventory': (pd.Timestamp('today') - last_sale_date).days,
+            'average_days_in_inventory_by_batch': average_days_in_inventory,
+            'days_to_expire': (sorted_product.iloc[-1]['exp_date'] - pd.Timestamp('today')).days,
+            monthly_df['date'].iloc[-2]: [monthly_df['quantity'].iloc[-2]],
+            monthly_df['date'].iloc[-1]: [monthly_df['quantity'].iloc[-1]],
+            'order_point_with_lead': [round(order_point_with_lead,2)],
+            'order_point_without_lead': [round(order_point_without_lead,2)],
+            'safety_stock': safety_stock,
+        }
+
+except Exception:
+    reorder = {
+        'product': [selected_product],
+        'net_stock': [0],
+        'days_in_inventory': [0],
+        'average_days_in_inventory_by_batch': [0],
+        'days_to_expire': [0],
+    }
 
 # --------------------------------------------------
-# TAB 3
+# FINAL TABLE
 # --------------------------------------------------
-with tab3:
+record = pd.DataFrame(reorder)
 
-    st.subheader("📋 Transaction History")
+st.markdown("""
+<div class="section-header">
+    📊 Product Health Summary
+</div>
+""", unsafe_allow_html=True)
 
-    st.dataframe(
-        sorted_product,
-        use_container_width=True,
-        height=500
-    )
-
-# --------------------------------------------------
-# TAB 4
-# --------------------------------------------------
-with tab4:
-
-    st.subheader("📊 Monthly Sales")
-
-    st.dataframe(
-        monthly_df,
-        use_container_width=True
-    )
+st.dataframe(record, use_container_width=True)
 
 # --------------------------------------------------
-# EXPLAINER
+# INFO SECTION (IMPORTANT)
 # --------------------------------------------------
-with st.expander("ℹ️ Inventory Planning Logic"):
+with st.expander("ℹ️ How These Metrics Are Calculated"):
 
-    st.markdown(
-        """
-        ### Forecast
-        - Next 2 months are projected using average historical monthly sales.
+    st.markdown("""
+### 📦 Stock In Hand
+Net inventory available at any point.
 
-        ### Lead Time Consumption
-        - Daily Sales = Total Sales / Total Days
-        - Lead Time Demand = Daily Sales × Lead Days
+**Formula:** Purchases − Sales
 
-        ### Reorder Point
+---
 
-        **Without Lead Time**
-        ```
-        Forecast Month 1 + Forecast Month 2
-        ```
+### ⏳ Inventory Aging
+Average time stock remains in warehouse.
 
-        **With Lead Time**
-        ```
-        Forecast Month 1
-        + Forecast Month 2
-        - Remaining Stock After Lead Time
-        ```
-        """
-    )
+**Formula:** Mean(Batch Closing Date − Batch Opening Date)
+
+---
+
+### 📈 Forecast (M+1, M+2)
+Based on historical monthly average sales.
+
+---
+
+### 🛡️ Safety Stock
+Buffer stock for demand & supply uncertainty.
+
+**Formula:**
+(Max Daily Sales × Max Lead Days) − Lead Time Demand
+
+---
+
+### 📦 Reorder Point (Lead Time)
+Demand during lead time + forecast adjustment.
+
+---
+
+### 📦 Reorder Point (No Lead Time)
+Simple forecast-based demand estimate.
+
+---
+
+### 📅 Days in Inventory
+Time between first and last sale.
+
+---
+
+### 📅 Days to Expiry
+Only calculated when stock is zero.
+""")

@@ -8,42 +8,80 @@ from utils.utilities import (
     get_net_stock_balance
 )
 
-path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/katyani stock as on -3 years.xlsx'
-sheet = 2
-current_df = read_dataset(path=path,sheet=sheet)
+
+file_path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/katyani stock as on -3 years.xlsx'
+
+current_df = read_dataset(path=file_path,sheet=2)
+current_df.loc[current_df['opening_qty']>0,'date'] = '7/17/2025'
+current_df['formatted_date'] = pd.to_datetime(current_df['date'], format='%m/%d/%Y')
+
 current_transactions = process_record_by_transactions_type(current_df)
 
-# suppliers information
 product_group_names = unique_product_group_name(current_transactions)
+
 selected_group = st.selectbox(
     label="Select Product Group Name:",
     options=product_group_names,
     index=0  
 )
 
-# products sold by suppliers
 products = products_of_seller(current_transactions,selected_group)
-record = []
+
+records = []
 for product in products:
     try:
-        # select specific product  and sort it by date
         use_col = ['date','transaction_type', 'uom', 'batch', 'mfg_date', 'exp_date', 'quantity','value', 'unit_price']
         product_df = current_transactions[current_transactions['product'] == product][use_col]
-        stock_in_hand = get_net_stock_balance(product_df)
+
         sorted_product = product_df.sort_values(by='date')
-        # filter product sales transactions
         product_sales = sorted_product[sorted_product['transaction_type']=='sales']
+
+        last_sale = product_sales.iloc[-1].date
+
+        batches = sorted_product['batch'].unique()
+
+        batch_record = []
+
+        for batch in batches:
+            filtered_df = sorted_product[sorted_product['batch'] == batch].sort_values(by='date')
+            if not filtered_df.empty:
+                filtered_sales_df = filtered_df[filtered_df['transaction_type']=='sales']
+                if not filtered_sales_df.empty:
+                    last_batch_sales = filtered_sales_df.iloc[-1]['date']
+                    opening_date = filtered_df.iloc[0]['date']
+                    f_net_stock = get_net_stock_balance(filtered_df)
+                    if int(f_net_stock)==0:
+                        batch_record.append({
+                            'batch':batch,
+                            'opening_date':opening_date,
+                            'net_stock':round(f_net_stock,2),
+                            'days_in_inventory': (last_batch_sales-opening_date).days
+                        })
+                    else:
+                        batch_record.append({
+                            'batch':batch,
+                            'opening_date':opening_date,
+                            'net_stock':round(f_net_stock,2),
+                            'days_in_inventory': (last_sale- opening_date ).days
+                            })
+
+        batch_df = pd.DataFrame(batch_record)
+        average_days_in_inventory = round(batch_df['days_in_inventory'].mean(),2)
+
+        first_sale_date = product_sales.iloc[0].date
         last_sale_date = product_sales.iloc[-1].date
-        #prepare series for analysis
+
+        stock_in_hand = get_net_stock_balance(product_df)
+
         product_sales_series = product_sales.sort_values(by='date')[['date','quantity']]
         product_sales_series = product_sales_series.groupby('date')['quantity'].sum().reset_index()
-        # aggegate sales monthly
-        monthly_df = product_sales_series.groupby(pd.Grouper(key='date', freq='ME')).sum().reset_index()
 
+        total_sale_days = (last_sale_date - first_sale_date).days
+
+        monthly_df = product_sales_series.groupby(pd.Grouper(key='date', freq='ME')).sum().reset_index()
         total_sales = monthly_df['quantity'].sum()
         duration = len(monthly_df)
 
-        # sales projection for next 2 months
         for i in range(2):
             monthly_df.loc[len(monthly_df)] = [
                 monthly_df['date'].iloc[-1]+pd.Timedelta(days=30),\
@@ -51,48 +89,58 @@ for product in products:
             ]
 
         pm1,pm2 = monthly_df['quantity'].iloc[-2],monthly_df['quantity'].iloc[-1]
-        per_day_sales = (total_sales)/ (duration*30)
+        per_day_sales = (total_sales) / total_sale_days
 
         lead_days = 75
         max_lead_days = 80
 
         lead_days_sales = lead_days * per_day_sales
+        safety_stock = (product_sales_series['quantity'].max() * max_lead_days) - \
+                        (lead_days_sales)
         stock_until_lead_days = (stock_in_hand)- (lead_days_sales)
 
         order_point_with_lead = pm1 + pm2 - (stock_until_lead_days)
-        order_point_without_lead = pm1+pm2
+        order_point_without_lead = pm1 + pm2
 
-        reorder = {
+        if stock_in_hand != 0:
+            reorder = {
+                'product': [product],
+                'net_stock': round(stock_in_hand,2),
+                'days_in_inventory': total_sale_days,
+                'average_days_in_inventory_by_batch': average_days_in_inventory,
+                'days_to_expire':0,
+                monthly_df['date'].iloc[-2]: [round(monthly_df['quantity'].iloc[-2],2)],
+                monthly_df['date'].iloc[-1]: [round(monthly_df['quantity'].iloc[-1],2)],
+                'order_point_with_lead': [round(order_point_with_lead,2)],
+                'order_point_without_lead': [round(order_point_without_lead,2)],
+                'safety_stock': safety_stock,
+                }
+        else:
+            reorder = {
             'product': [product],
             'net_stock': round(stock_in_hand,2),
-            'number_of_days_since_last_sale': (pd.Timestamp('today') - last_sale_date).days,
-            monthly_df['date'].iloc[-2]: [monthly_df['quantity'].iloc[-2]],
-            monthly_df['date'].iloc[-1]: [monthly_df['quantity'].iloc[-1]],
+            'days_in_inventory': (pd.Timestamp('today') - last_sale_date).days,
+            'average_days_in_inventory_by_batch': average_days_in_inventory,
+            'days_to_expire':(sorted_product.iloc[-1]['exp_date'] - pd.Timestamp('today')).days,
+            monthly_df['date'].iloc[-2]: [round(monthly_df['quantity'].iloc[-2],2)],
+            monthly_df['date'].iloc[-1]: [round(monthly_df['quantity'].iloc[-1],2)],
             'order_point_with_lead': [round(order_point_with_lead,2)],
             'order_point_without_lead': [round(order_point_without_lead,2)],
-        }
-        # record.append(reorder)
-    except Exception as e:
-        reorder = {
-            'product': [product],
-            'net_stock': [0],
-            'order_point_with_lead': [0],
-            'order_point_without_lead': [0],
-        }
-    record.append(reorder)
-    
-    
+            'safety_stock': safety_stock,
+            }
+        records.append(reorder)
 
-    
-reorder_df = pd.DataFrame(record)
+    except Exception as e:
+        pass
+
+
+reorder_df = pd.DataFrame(records)
 st.write(reorder_df)
 
 
 
+# individual 
 
-
-
-# indi page 
 
 import pandas as pd
 import streamlit as st
@@ -104,77 +152,149 @@ from utils.utilities import (
     get_net_stock_balance
 )
 
-path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/katyani stock as on -3 years.xlsx'
-sheet = 2
-current_df = read_dataset(path=path,sheet=sheet)
+
+file_path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/katyani stock as on -3 years.xlsx'
+
+current_df = read_dataset(path=file_path,sheet=2)
+current_df.loc[current_df['opening_qty']>0,'date'] = '7/17/2025'
+current_df['formatted_date'] = pd.to_datetime(current_df['date'], format='%m/%d/%Y')
+
 current_transactions = process_record_by_transactions_type(current_df)
 
-# suppliers information
 product_group_names = unique_product_group_name(current_transactions)
+
 selected_group = st.selectbox(
     label="Select Product Group Name:",
     options=product_group_names,
     index=0  
 )
 
-# products sold by suppliers
 products = products_of_seller(current_transactions,selected_group)
 selected_product = st.selectbox(
     label="Select Product:",
     options=products
 )
 
-# select specific product  and sort it by date
-use_col = ['date','transaction_type', 'uom', 'batch', 'mfg_date', 'exp_date', 'quantity','value', 'unit_price']
-product_df = current_transactions[current_transactions['product'] == selected_product][use_col]
-stock_in_hand = get_net_stock_balance(product_df)
-sorted_product = product_df.sort_values(by='date')
-st.write(sorted_product)
-# filter product sales transactions
-product_sales = sorted_product[sorted_product['transaction_type']=='sales']
+try:
+    use_col = ['date','transaction_type', 'uom', 'batch', 'mfg_date', 'exp_date', 'quantity','value', 'unit_price']
+    product_df = current_transactions[current_transactions['product'] == selected_product][use_col]
 
-# last_sale_date = product_sales.iloc[-1].date
-#prepare series for analysis
-product_sales_series = product_sales.sort_values(by='date')[['date','quantity']]
-product_sales_series = product_sales_series.groupby('date')['quantity'].sum().reset_index()
-# aggegate sales monthly
-monthly_df = product_sales_series.groupby(pd.Grouper(key='date', freq='ME')).sum().reset_index()
+    sorted_product = product_df.sort_values(by='date')
+    product_sales = sorted_product[sorted_product['transaction_type']=='sales']
 
-total_sales = monthly_df['quantity'].sum()
-duration = len(monthly_df)
+    last_sale = product_sales.iloc[-1].date
 
-# sales projection for next 2 months
-for i in range(2):
-    monthly_df.loc[len(monthly_df)] = [
-        monthly_df['date'].iloc[-1]+pd.Timedelta(days=30),\
-        monthly_df['quantity'].tail(duration).mean()
-    ]
+    batches = sorted_product['batch'].unique()
 
-pm1,pm2 = monthly_df['quantity'].iloc[-2],monthly_df['quantity'].iloc[-1]
-per_day_sales = (total_sales)/ (duration*30)
+    batch_record = []
 
-lead_days = 75
-max_lead_days = 80
+    for batch in batches:
+        filtered_df = sorted_product[sorted_product['batch'] == batch].sort_values(by='date')
+        if not filtered_df.empty:
+            filtered_sales_df = filtered_df[filtered_df['transaction_type']=='sales']
+            if not filtered_sales_df.empty:
+                last_batch_sales = filtered_sales_df.iloc[-1]['date']
+                opening_date = filtered_df.iloc[0]['date']
+                f_net_stock = get_net_stock_balance(filtered_df)
+                if int(f_net_stock)==0:
+                    batch_record.append({
+                        'batch':batch,
+                        'opening_date':opening_date,
+                        'net_stock':round(f_net_stock,2),
+                        'days_in_inventory': (last_batch_sales-opening_date).days
+                    })
+                else:
+                    batch_record.append({
+                        'batch':batch,
+                        'opening_date':opening_date,
+                        'net_stock':round(f_net_stock,2),
+                        'days_in_inventory': (last_sale- opening_date ).days
+                        })
 
-lead_days_sales = lead_days * per_day_sales
-stock_until_lead_days = (stock_in_hand)- (lead_days_sales)
+    batch_df = pd.DataFrame(batch_record)
+    st.write(batch_df)
+    average_days_in_inventory = round(batch_df['days_in_inventory'].mean(),2)
 
-order_point_with_lead = pm1 + pm2 - (stock_until_lead_days)
-order_point_without_lead = pm1+pm2
+    first_sale_date = product_sales.iloc[0].date
+    last_sale_date = product_sales.iloc[-1].date
 
-reorder = {
-    'product': [selected_product],
-    'net_stock': stock_in_hand,
-    # 'number_of_days_since_last_sale': (pd.Timestamp('today') - last_sale_date).days,
-    monthly_df['date'].iloc[-2]: [monthly_df['quantity'].iloc[-2]],
-    monthly_df['date'].iloc[-1]: [monthly_df['quantity'].iloc[-1]],
-    'order_point_with_lead': [order_point_with_lead],
-    'order_point_without_lead': [order_point_without_lead],
+    stock_in_hand = get_net_stock_balance(product_df)
 
-}
-    
-reorder_df = pd.DataFrame(reorder)
-st.write(reorder_df)
+    product_sales_series = product_sales.sort_values(by='date')[['date','quantity']]
+    product_sales_series = product_sales_series.groupby('date')['quantity'].sum().reset_index()
+
+    total_sale_days = (last_sale_date - first_sale_date).days
+
+    monthly_df = product_sales_series.groupby(pd.Grouper(key='date', freq='ME')).sum().reset_index()
+    total_sales = monthly_df['quantity'].sum()
+    duration = len(monthly_df)
+
+    for i in range(2):
+        monthly_df.loc[len(monthly_df)] = [
+            monthly_df['date'].iloc[-1]+pd.Timedelta(days=30),\
+            monthly_df['quantity'].tail(duration).mean()
+        ]
+
+    pm1,pm2 = monthly_df['quantity'].iloc[-2],monthly_df['quantity'].iloc[-1]
+    per_day_sales = (total_sales) / total_sale_days
+
+    lead_days = 75
+    max_lead_days = 80
+
+    lead_days_sales = lead_days * per_day_sales
+    safety_stock = (product_sales_series['quantity'].max() * max_lead_days) - \
+                    (lead_days_sales)
+    stock_until_lead_days = (stock_in_hand)- (lead_days_sales)
+
+    order_point_with_lead = pm1 + pm2 - (stock_until_lead_days)
+    order_point_without_lead = pm1 + pm2
+
+    if stock_in_hand != 0:
+        reorder = {
+            'product': [selected_product],
+            'net_stock': round(stock_in_hand,2),
+            'days_in_inventory': total_sale_days,
+            'average_days_in_inventory_by_batch': average_days_in_inventory,
+            'days_to_expire':0,
+            monthly_df['date'].iloc[-2]: [monthly_df['quantity'].iloc[-2]],
+            monthly_df['date'].iloc[-1]: [monthly_df['quantity'].iloc[-1]],
+            'order_point_with_lead': [round(order_point_with_lead,2)],
+            'order_point_without_lead': [round(order_point_without_lead,2)],
+            'safety_stock': safety_stock,
+            }
+    else:
+        reorder = {
+        'product': [selected_product],
+        'net_stock': round(stock_in_hand,2),
+        'days_in_inventory': (pd.Timestamp('today') - last_sale_date).days,
+        'average_days_in_inventory_by_batch': average_days_in_inventory,
+        'days_to_expire':(sorted_product.iloc[-1]['exp_date'] - pd.Timestamp('today')).days,
+        monthly_df['date'].iloc[-2]: [monthly_df['quantity'].iloc[-2]],
+        monthly_df['date'].iloc[-1]: [monthly_df['quantity'].iloc[-1]],
+        'order_point_with_lead': [round(order_point_with_lead,2)],
+        'order_point_without_lead': [round(order_point_without_lead,2)],
+        'safety_stock': safety_stock,
+        }
+
+except Exception as e:
+    reorder = {
+        'product': [selected_product],
+        'net_stock': [0],
+        'days_in_inventory': [0],
+        'average_days_in_inventory_by_batch': [0],
+        'days_to_expire':[0],
+        # monthly_df['date'].iloc[-2]: [monthly_df['quantity'].iloc[-2]],
+        # monthly_df['date'].iloc[-1]: [monthly_df['quantity'].iloc[-1]],
+        # 'order_point_with_lead': [round(order_point_with_lead,2)],
+        # 'order_point_without_lead': [round(order_point_without_lead,2)],
+        # 'safety_stock': safety_stock,
+        }
+
+record = pd.DataFrame(reorder)
+st.write(record)
+
+
+
 
 
 
