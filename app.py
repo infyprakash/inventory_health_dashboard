@@ -3,8 +3,8 @@ import math
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import torch
-import timesfm
+# import torch
+# import timesfm
 import streamlit as st
 from pathlib import Path
 
@@ -234,7 +234,7 @@ try:
     c1.metric("📦 Products Processed", len(result_df))
     c2.metric("⚠️ Avg Expiry Risk (days)", round(result_df['days_to_expire'].mean(), 2))
     c3.metric("📉 Avg Stock", round(result_df['stock_in_hand'].mean(), 2))
-    c4.metric("📊 Avg Forecast Order Point", round(result_df['order_point_forecasted'].mean(), 2))
+    # c4.metric("📊 Avg Forecast Order Point", round(result_df['order_point_forecasted'].mean(), 2))
 
     # =========================
     # CHARTS
