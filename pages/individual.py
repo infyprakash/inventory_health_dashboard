@@ -4,8 +4,8 @@ import math
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-# import torch
-# import timesfm
+import torch
+import timesfm
 import streamlit as st
 from pathlib import Path
 
@@ -223,44 +223,44 @@ try:
         # =========================
         # FORECASTING (TimesFM)
         # =========================
-        # st.subheader("🤖 Demand Forecasting (AI Model)")
+        st.subheader("🤖 Demand Forecasting (AI Model)")
 
-        # print("Loading pre-trained TimesFM 2.5 weights from HuggingFace...")
+        print("Loading pre-trained TimesFM 2.5 weights from HuggingFace...")
 
-        # monthly_df = product_sales_series.groupby(pd.Grouper(key='date', freq='ME')).sum()
+        monthly_df = product_sales_series.groupby(pd.Grouper(key='date', freq='ME')).sum()
 
-        # full_range = pd.date_range(start=monthly_df.index.min(),
-        #                            end=monthly_df.index.max(),
-        #                            freq='ME')
+        full_range = pd.date_range(start=monthly_df.index.min(),
+                                   end=monthly_df.index.max(),
+                                   freq='ME')
 
-        # monthly_df = monthly_df.reindex(full_range, fill_value=0)
-        # final_df = monthly_df.reset_index()
+        monthly_df = monthly_df.reindex(full_range, fill_value=0)
+        final_df = monthly_df.reset_index()
 
-        # sales_history = final_df['quantity'].to_numpy(dtype="float32")
+        sales_history = final_df['quantity'].to_numpy(dtype="float32")
 
-        # torch.set_float32_matmul_precision("high")
+        torch.set_float32_matmul_precision("high")
 
-        # model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(
-        #     "google/timesfm-2.5-200m-pytorch",
-        # )
+        model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(
+            "google/timesfm-2.5-200m-pytorch",
+        )
 
-        # model.compile(timesfm.ForecastConfig(
-        #     max_context=512,
-        #     max_horizon=32,
-        #     infer_is_positive=True,
-        # ))
+        model.compile(timesfm.ForecastConfig(
+            max_context=512,
+            max_horizon=32,
+            infer_is_positive=True,
+        ))
 
-        # point_forecast, quantile_forecast = model.forecast(
-        #     horizon=2,
-        #     inputs=[sales_history]
-        # )
+        point_forecast, quantile_forecast = model.forecast(
+            horizon=2,
+            inputs=[sales_history]
+        )
 
-        # next_month_1 = point_forecast[0][0]
-        # next_month_2 = point_forecast[0][1]
+        next_month_1 = point_forecast[0][0]
+        next_month_2 = point_forecast[0][1]
 
-        # order_point_forecasted = (next_month_1 + next_month_2) - stock_until_lead_days
+        order_point_forecasted = (next_month_1 + next_month_2) - stock_until_lead_days
 
-        # basic_result['order_point_forecasted'] = [order_point_forecasted]
+        basic_result['order_point_forecasted'] = [order_point_forecasted]
 
         result_df = pd.DataFrame(basic_result)
 
