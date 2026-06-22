@@ -216,8 +216,8 @@ try:
                 'total_sales': total_alt_sales,
                 'first_month':monthly_df['date'].iloc[-2],
                 'second_month':monthly_df['date'].iloc[-1],
-                'pm1':[pm1_avg],
-                'pm2':[pm2_avg],
+                'pm1':pm1_avg,
+                'pm2':pm2_avg,
                 'order_point_avg': order_point,
                 # 'order_point_forecasted': order_point_forecasted
             })
