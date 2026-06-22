@@ -34,7 +34,7 @@ st.caption("Batch-wise stock analytics + demand forecasting + reorder intelligen
 # =========================
 # path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/stocks.xlsx'
 
-THIS_DIR = Path(__file__).parent
+THIS_DIR = Path(__file__)
 path = THIS_DIR / 'stocks.xlsx'
 
 df = read_dataset(path=path)
