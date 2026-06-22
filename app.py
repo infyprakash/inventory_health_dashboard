@@ -218,7 +218,7 @@ try:
                 'second_month':monthly_df['date'].iloc[-1],
                 'pm1':round(pm1_avg,2),
                 'pm2':round(pm2_avg,2),
-                'order_point_avg': order_point,
+                'order_point_avg': round(order_point,2),
                 # 'order_point_forecasted': order_point_forecasted
             })
 
