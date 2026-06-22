@@ -244,7 +244,7 @@ try:
     st.write('stock in hand')
     st.bar_chart(result_df.set_index('product')[['stock_in_hand']])
     st.write('forecasted order point')
-    st.bar_chart(result_df.set_index('product')[['order_point_forecasted']])
+    # st.bar_chart(result_df.set_index('product')[['order_point_forecasted']])
 
     # =========================
     # RAW DATA
