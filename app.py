@@ -214,6 +214,10 @@ try:
                 'stock_in_hand': round(stock_in_hand, 2),
                 'stock_until_lead_days': stock_until_lead_days,
                 'total_sales': total_alt_sales,
+                'first_month':[monthly_df['date'].iloc[-2]],
+                'second_month':[monthly_df['date'].iloc[-1]],
+                'pm1':[pm1_avg],
+                'pm2':[pm2_avg],
                 'order_point_avg': order_point,
                 # 'order_point_forecasted': order_point_forecasted
             })
@@ -227,6 +231,10 @@ try:
                 'stock_in_hand': round(stock_in_hand, 2),
                 'stock_until_lead_days': 0,
                 'total_sales': 0,
+                'first_month':pd.NaT,
+                'second_month':pd.NaT,
+                'pm1':[0],
+                'pm2':[0],
                 'order_point_avg': 0,
                 # 'order_point_forecasted': order_point_forecasted
             })
