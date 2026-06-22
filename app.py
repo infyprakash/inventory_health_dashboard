@@ -163,43 +163,43 @@ try:
             # =========================
             # FORECAST MODEL
             # =========================
-            monthly_df_model = product_sales_series.groupby(
-                pd.Grouper(key='date', freq='ME')
-            ).sum()
+            # monthly_df_model = product_sales_series.groupby(
+            #     pd.Grouper(key='date', freq='ME')
+            # ).sum()
 
-            full_range = pd.date_range(
-                start=monthly_df_model.index.min(),
-                end=monthly_df_model.index.max(),
-                freq='ME'
-            )
+            # full_range = pd.date_range(
+            #     start=monthly_df_model.index.min(),
+            #     end=monthly_df_model.index.max(),
+            #     freq='ME'
+            # )
 
-            monthly_df_model = monthly_df_model.reindex(full_range, fill_value=0)
+            # monthly_df_model = monthly_df_model.reindex(full_range, fill_value=0)
 
-            final_df = monthly_df_model.reset_index()
+            # final_df = monthly_df_model.reset_index()
 
-            sales_history = final_df['quantity'].to_numpy(dtype="float32")
+            # sales_history = final_df['quantity'].to_numpy(dtype="float32")
 
-            torch.set_float32_matmul_precision("high")
+            # torch.set_float32_matmul_precision("high")
 
-            model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(
-                "google/timesfm-2.5-200m-pytorch",
-            )
+            # model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(
+            #     "google/timesfm-2.5-200m-pytorch",
+            # )
 
-            model.compile(timesfm.ForecastConfig(
-                max_context=512,
-                max_horizon=32,
-                infer_is_positive=True,
-            ))
+            # model.compile(timesfm.ForecastConfig(
+            #     max_context=512,
+            #     max_horizon=32,
+            #     infer_is_positive=True,
+            # ))
 
-            point_forecast, _ = model.forecast(
-                horizon=2,
-                inputs=[sales_history]
-            )
+            # point_forecast, _ = model.forecast(
+            #     horizon=2,
+            #     inputs=[sales_history]
+            # )
 
-            next_month_1 = point_forecast[0][0]
-            next_month_2 = point_forecast[0][1]
+            # next_month_1 = point_forecast[0][0]
+            # next_month_2 = point_forecast[0][1]
 
-            order_point_forecasted = (next_month_1 + next_month_2) - stock_until_lead_days
+            # order_point_forecasted = (next_month_1 + next_month_2) - stock_until_lead_days
 
             # =========================
             # STORE RESULT
@@ -212,7 +212,7 @@ try:
                 'stock_until_lead_days': stock_until_lead_days,
                 'total_sales': total_alt_sales,
                 'order_point_avg': order_point,
-                'order_point_forecasted': order_point_forecasted
+                # 'order_point_forecasted': order_point_forecasted
             })
 
         else:
