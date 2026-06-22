@@ -19,6 +19,7 @@ from utils.utilities import (
 # =========================
 # PAGE CONFIG
 # =========================
+
 st.set_page_config(
     page_title="📦 Multi-Product Inventory Intelligence",
     page_icon="📊",

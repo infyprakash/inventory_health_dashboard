@@ -14,7 +14,6 @@ from utils.utilities import (
     net_alt_stock
 )
 
-os.environ["HF_TOKEN"] = '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'
 
 path = '/Users/prakash/infography_projects/project-2.0/inventory_health_dashboard/stocks.xlsx'
 df = pd.read_excel(path,skiprows=7)
