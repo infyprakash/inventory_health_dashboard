@@ -219,7 +219,18 @@ try:
             })
 
         else:
-            st.warning(f"⚠️ No sales record for: {product}")
+            store.append({
+                'product': product,
+                'number_of_days_since_last_sale':number_of_days_since_last_sale,
+                'batch_avg_inventory_days': batch_average_days_in_inventory,
+                'days_to_expire': days_to_expire,
+                'stock_in_hand': round(stock_in_hand, 2),
+                'stock_until_lead_days': 0,
+                'total_sales': 0,
+                'order_point_avg': 0,
+                # 'order_point_forecasted': order_point_forecasted
+            })
+            # st.warning(f"⚠️ No sales record for: {product}")
 
         # progress
         progress_bar.progress((idx + 1) / len(products))
