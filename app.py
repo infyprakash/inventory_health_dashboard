@@ -144,13 +144,11 @@ try:
             product_sales_series = product_sales[['date','quantity']].groupby('date').sum().reset_index()
 
             monthly_df = product_sales_series.groupby(pd.Grouper(key='date', freq='ME')).sum().reset_index()
-
-            o_monthly_df = monthly_df.copy()
+            duration = len(monthly_df)
             
 
             # extend trend
             for i in range(2):
-                duration = len(monthly_df)
                 monthly_df.loc[len(monthly_df)] = [
                     monthly_df['date'].iloc[-1] + pd.Timedelta(days=30),
                     monthly_df['quantity'].tail(duration).mean()
