@@ -203,9 +203,10 @@ try:
         # ORDER POINT INFO
         # =========================
         st.subheader("📍 Order Planning Indicators")
-
+        number_of_days_since_last_sale = (last_sale - product_sales['date'].iloc[-1] ).days
         basic_result = {
             'product': [selected_product],
+            'number_of_days_since_last_sale':number_of_days_since_last_sale,
             'batch_average_days_in_inventory': [batch_average_days_in_inventory],
             'days_to_expire': [days_to_expire],
             'stock_in_hand': [round(stock_in_hand, 2)],
