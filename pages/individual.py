@@ -151,13 +151,13 @@ try:
         product_sales_series = product_sales_series.groupby('date')['quantity'].sum().reset_index()
 
         monthly_df = product_sales_series.groupby(pd.Grouper(key='date', freq='ME')).sum().reset_index()
-        o_monthly_df = monthly_df.copy()
+        duration = len(monthly_df)
 
         # extend forecast baseline
         for i in range(2):
             monthly_df.loc[len(monthly_df)] = [
                 monthly_df['date'].iloc[-1] + pd.Timedelta(days=30),
-                monthly_df['quantity'].mean()
+                monthly_df['quantity'].tail(duration).mean()
             ]
 
         pm1_avg, pm2_avg = monthly_df['quantity'].iloc[-2], monthly_df['quantity'].iloc[-1]
@@ -184,7 +184,7 @@ try:
         # =========================
         st.subheader("📈 Monthly Sales Trend")
 
-        st.line_chart(o_monthly_df.set_index('date'))
+        st.line_chart(monthly_df.set_index('date'))
 
         # =========================
         # BATCH ANALYSIS
