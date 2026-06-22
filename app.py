@@ -146,9 +146,11 @@ try:
             monthly_df = product_sales_series.groupby(pd.Grouper(key='date', freq='ME')).sum().reset_index()
 
             o_monthly_df = monthly_df.copy()
+            
 
             # extend trend
             for i in range(2):
+                duration = len(monthly_df)
                 monthly_df.loc[len(monthly_df)] = [
                     monthly_df['date'].iloc[-1] + pd.Timedelta(days=30),
                     monthly_df['quantity'].mean()
@@ -216,8 +218,8 @@ try:
                 'total_sales': total_alt_sales,
                 'first_month':monthly_df['date'].iloc[-2],
                 'second_month':monthly_df['date'].iloc[-1],
-                'pm1':pm1_avg,
-                'pm2':pm2_avg,
+                'pm1':round(pm1_avg,2),
+                'pm2':round(pm2_avg,2),
                 'order_point_avg': order_point,
                 # 'order_point_forecasted': order_point_forecasted
             })
@@ -233,8 +235,8 @@ try:
                 'total_sales': 0,
                 'first_month':pd.NaT,
                 'second_month':pd.NaT,
-                'pm1':[0],
-                'pm2':[0],
+                'pm1':0,
+                'pm2':0,
                 'order_point_avg': 0,
                 # 'order_point_forecasted': order_point_forecasted
             })
