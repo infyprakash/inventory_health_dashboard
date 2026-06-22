@@ -93,6 +93,7 @@ try:
 
         product_df = current_transactions[current_transactions['product'] == product][use_col]
         sorted_product = product_df.sort_values(by='date')
+        last_sale = sorted_product.iloc[-1].date
 
         batches = sorted_product['batch'].unique()
 
@@ -204,8 +205,10 @@ try:
             # =========================
             # STORE RESULT
             # =========================
+            number_of_days_since_last_sale = (last_sale - product_sales['date'].iloc[-1] ).days
             store.append({
                 'product': product,
+                'number_of_days_since_last_sale':number_of_days_since_last_sale,
                 'batch_avg_inventory_days': batch_average_days_in_inventory,
                 'days_to_expire': days_to_expire,
                 'stock_in_hand': round(stock_in_hand, 2),
