@@ -1,40 +1,29 @@
+import os
+
 import numpy as np
 import pandas as pd
 import streamlit as st
+import timesfm
 from math import sqrt
 
 def read_dataset(path):
-    df = pd.read_excel(path,skiprows=7)
-    df = df.iloc[:-1]
+  df = pd.read_excel(path,skiprows=7)
+  df = df.iloc[:-1]
+  df.columns = ['product_group_name', 'product_additional_group', 'product_sub_group',
+       'product', 'date', 'uom', 'inv_no', 'batch', 'miti', 'batch_rate',
+       'batch_buy_price', 'batch_sales_price', 'batch_mrp', 'descriptions',
+       'mfg_date', 'exp_date', 'opening_alt_stock_qty', 'opening_stock_qty', 'opening_stock_value',
+       'purchase_invoice_in_alt_stock_qty', 'purchase_invoice_in_stock_qty', 'purchase_invoice_in_stock_value',
+       'stock_adjustment_in_alt_stock_qty', 'stock_adjustment_in_stock_qty', 'stock_adjustment_in_stock_value',
+       'sales_return_in_alt_stock_qty', 'sales_return_in_stock_qty', 'sales_return_in_stock_value',
+       'sales_invoice_out_alt_stock_qty', 'sales_invoice_out_stock_qty', 'sales_invoice_out_stock_value',
+       'stock_adjustment_out_alt_stock_qty', 'stock_adjustment_out_stock_qty', 'stock_adjustment_out_stock_value',
+       'balance_alt_stock_qty', 'balance_stock_qty', 'balance_stock_value']
 
-    df.columns = ['product_group_name', 'product_additional_group', 'product_sub_group',
-        'product', 'date', 'uom', 'inv_no', 'batch', 'miti', 'batch_rate',
-        'batch_buy_price', 'batch_sales_price', 'batch_mrp', 'descriptions',
-        'mfg_date', 'exp_date', 'opening_alt_stock_qty', 'opening_stock_qty', 'opening_stock_value',
-        'purchase_invoice_in_alt_stock_qty', 'purchase_invoice_in_stock_qty', 'purchase_invoice_in_stock_value',
-        'stock_adjustment_in_alt_stock_qty', 'stock_adjustment_in_stock_qty', 'stock_adjustment_in_stock_value',
-        'sales_return_in_alt_stock_qty', 'sales_return_in_stock_qty', 'sales_return_in_stock_value',
-        'sales_invoice_out_alt_stock_qty', 'sales_invoice_out_stock_qty', 'sales_invoice_out_stock_value',
-        'stock_adjustment_out_alt_stock_qty', 'stock_adjustment_out_stock_qty', 'stock_adjustment_out_stock_value',
-        'balance_alt_stock_qty', 'balance_stock_qty', 'balance_stock_value']
-
-
-
-    numeric_cols = ['opening_alt_stock_qty', 'opening_stock_qty', 'opening_stock_value',
-        'purchase_invoice_in_alt_stock_qty', 'purchase_invoice_in_stock_qty', 'purchase_invoice_in_stock_value',
-        'stock_adjustment_in_alt_stock_qty', 'stock_adjustment_in_stock_qty', 'stock_adjustment_in_stock_value',
-        'sales_return_in_alt_stock_qty', 'sales_return_in_stock_qty', 'sales_return_in_stock_value',
-        'sales_invoice_out_alt_stock_qty', 'sales_invoice_out_stock_qty', 'sales_invoice_out_stock_value',
-        'stock_adjustment_out_alt_stock_qty', 'stock_adjustment_out_stock_qty', 'stock_adjustment_out_stock_value',
-        'balance_alt_stock_qty', 'balance_stock_qty', 'balance_stock_value']
-
-    for col in numeric_cols:
-        df.loc[:,col] = df[col].fillna(0)
-
-    df.loc[df['opening_alt_stock_qty']>0,'date'] = '7/17/2025'
-    df['formatted_date'] = pd.to_datetime(df['date'], format='%m/%d/%Y')
-    df['exp_date'] = pd.to_datetime(df['exp_date'], format='%Y-%m-%d')
-    return df
+  df.loc[df['opening_alt_stock_qty']>0,'date'] = '7/17/2025'
+  df['formatted_date'] = pd.to_datetime(df['date'], format='%m/%d/%Y')
+  df['exp_date'] = pd.to_datetime(df['exp_date'], format='%Y-%m-%d')
+  return df
 
 def process_record_by_transactions_type(dataframe):
     tran_rows = []
@@ -175,6 +164,12 @@ def products_of_seller(df,group_name,col='product_group_name',filter_col='produc
   products = df[df[col]==group_name]['product'].unique()
   return products
 
+def get_first_last_transaction_date(transactions):
+  sorted_transactions = transactions.sort_values(by='date')
+  first_date = sorted_transactions['date'].iloc[0]
+  last_date = sorted_transactions['date'].iloc[-1]
+  return first_date,last_date
+
 def net_alt_stock(product_df):
   total_opening = product_df[product_df['transaction_type']=='opening']['alt_quantity'].sum()
   total_purchase = product_df[product_df['transaction_type']=='purchase']['alt_quantity'].sum()
@@ -183,6 +178,34 @@ def net_alt_stock(product_df):
   total_adjustment_out = product_df[product_df['transaction_type']=='adjustment_out']['alt_quantity'].sum()
   total_sales = product_df[product_df['transaction_type']=='sales']['alt_quantity'].sum()
   net_stock_balance = (total_opening + total_purchase + total_sales_return + total_adjustment_in) - (total_sales+total_adjustment_out)
-  return net_stock_balance
+  net_sales = total_sales - total_sales_return
+  return net_stock_balance,net_sales
+
+def get_sales_quantity(product_df,record):
+  total_sales = net_alt_stock(product_df)[1]
+  per_day_sales = round((total_sales / record['average_days_in_inventory']),2) if record['net_alt_qty'] > 0 else round((total_sales / record['average_days_to_last_sale']),2)
+  return total_sales,per_day_sales
+
+def get_transactions(df):
+   transactions = process_record_by_transactions_type(dataframe=df)
+   return transactions
+
+
+@st.cache_resource
+def load_timesfm_model():
+    os.environ["HF_TOKEN"] = st.secrets["HF_TOKEN"]
+    model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(
+        "google/timesfm-2.5-200m-pytorch",
+    )
+    # If running on CPU (Streamlit Cloud), compilation often causes issues/slowness.
+    # Try omitting model.compile() if you are just doing a few inferences.
+    model.compile(timesfm.ForecastConfig(
+        max_context=512, max_horizon=32, infer_is_positive=True,
+    ))
+    return model
+
+
+
+
 
 
